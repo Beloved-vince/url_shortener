@@ -7,11 +7,13 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
+from rest_framework_simplejwt.tokens import RefreshToken
 
 
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponseRedirect
+from django.http import JsonResponse
 
 from .models import URLShortener
 from .serializers import URLShortenerSerializer, ClickSerializer
@@ -37,17 +39,24 @@ class UserLogin(APIView):
         email = request.data.get('email')
         password = request.data.get('password')
 
-        if not email or not password:
-            return Response({'error': 'Please provide both email and password'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            if not email or not password:
+                return Response({'error': 'Please provide both email and password'}, status=status.HTTP_400_BAD_REQUEST)
 
-        user = authenticate(email=email, password=password)
+            user = authenticate(request, email=email, password=password)
 
-        if user:
-            token, created = Token.objects.get_or_create(user=user)
-            return Response({'token': token.key}, status=status.HTTP_200_OK)
-        else:
-            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
-
+            if user is not None:
+                refresh = RefreshToken.for_user(user)
+                return JsonResponse({
+                    'refresh': str(refresh),
+                    'access': str(refresh.access_token),
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+        except Exception as e:
+            print(e)
+            return Response({'error': 'Internal Server Error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
 
 def generate_short_url():
     ''' A Function to generate a random short URL '''
