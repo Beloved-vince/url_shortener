@@ -1,10 +1,25 @@
 from rest_framework import serializers
 from .models import URLShortener, Click
+from .models import CustomUser
+
+class CustomUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'email', 'password', 'is_active', 'is_staff']
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def create(self, validated_data):
+        password = validated_data.pop('password', None)
+        user = CustomUser.objects.create(**validated_data)
+        if password:
+            user.set_password(password)
+            user.save()
+        return user
+    
 
 class URLShortenerSerializer(serializers.ModelSerializer):
     shortened_url = serializers.SerializerMethodField()
     
-
     class Meta:
         model = URLShortener
         fields = ['id', 'original_url', 'shortened_url', 'clicks', 'created_at']

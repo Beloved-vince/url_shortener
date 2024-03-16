@@ -4,15 +4,50 @@ from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import URLShortenerSerializer, ClickSerializer
-from .models import URLShortener
-import string
-import random
-from .forms import URLShortenerForm
+from rest_framework.authtoken.models import Token
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import TokenAuthentication
+
+
+from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponseRedirect
 
+from .models import URLShortener
+from .serializers import URLShortenerSerializer, ClickSerializer
+from .forms import URLShortenerForm
+from .serializers import CustomUserSerializer
 
+import string
+import random
+
+
+
+class UserRegistration(APIView):
+    def post(self, request):
+        serializer = CustomUserSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class UserLogin(APIView):
+    def post(self, request):
+        email = request.data.get('email')
+        password = request.data.get('password')
+
+        if not email or not password:
+            return Response({'error': 'Please provide both email and password'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = authenticate(email=email, password=password)
+
+        if user:
+            token, created = Token.objects.get_or_create(user=user)
+            return Response({'token': token.key}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
 
 def generate_short_url():
@@ -33,6 +68,8 @@ def redirect_to_original_url(request, shortened_url):
     url_shortener.clicks += 1
     url_shortener.save()
     return HttpResponseRedirect(url_shortener.original_url)
+
+
 class URLShortenerCreate(APIView):
     '''
         Check if the URL is already shortened
@@ -40,6 +77,10 @@ class URLShortenerCreate(APIView):
         Create and save the new URLShortener object
         Serialize the new object and return it
     '''
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    
     def post(self, request):
         form = URLShortenerForm(request.data)
         try:
