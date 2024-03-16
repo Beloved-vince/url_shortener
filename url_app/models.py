@@ -38,6 +38,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     
 
 class URLShortener(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     original_url = models.URLField(max_length=2000)
     shortened_url = models.CharField(max_length=50, unique=True)
     clicks = models.PositiveIntegerField(default=0)

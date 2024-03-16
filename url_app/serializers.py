@@ -22,7 +22,7 @@ class URLShortenerSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = URLShortener
-        fields = ['id', 'original_url', 'shortened_url', 'clicks', 'created_at']
+        fields = ['user','id', 'original_url', 'shortened_url', 'clicks', 'created_at']
         
     def get_shortened_url(self, obj):
         request = self.context.get('request')

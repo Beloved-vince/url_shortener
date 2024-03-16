@@ -22,7 +22,6 @@ import string
 import random
 
 
-
 class UserRegistration(APIView):
     def post(self, request):
         serializer = CustomUserSerializer(data=request.data)
@@ -61,7 +60,7 @@ def generate_short_url():
 
 def redirect_to_original_url(request, shortened_url):
     '''
-    View to redirect to the original URL when given the shortened URL.
+    function to redirect to the original URL when given the shortened URL.
     Increments the clicks count for the shortened URL.
     '''
     url_shortener = get_object_or_404(URLShortener, shortened_url=shortened_url)
@@ -77,9 +76,7 @@ class URLShortenerCreate(APIView):
         Create and save the new URLShortener object
         Serialize the new object and return it
     '''
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    
     
     def post(self, request):
         form = URLShortenerForm(request.data)
@@ -93,7 +90,12 @@ class URLShortenerCreate(APIView):
                     return Response(serializer.data, status=status.HTTP_200_OK)
 
                 short_url = generate_short_url()
-                new_url_shortener = URLShortener(original_url=original_url, shortened_url=short_url)
+                user = request.user
+
+                new_url_shortener = URLShortener(original_url=original_url,
+                                                 shortened_url=short_url,
+                                                user=user
+                                                )
                 new_url_shortener.save()
                 serializer = URLShortenerSerializer(new_url_shortener, context={'request': request})
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -103,3 +105,52 @@ class URLShortenerCreate(APIView):
         return Response(form.errors, status=status.HTTP_400_BAD_REQUEST)
     
     
+    
+class URLShortenerList(APIView):
+    '''
+    Get a list of all shortened URLs for the authenticated user
+    '''
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        shortened_urls = URLShortener.objects.filter(user=user)
+        serializer = URLShortenerSerializer(shortened_urls, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+class URLShortenerUpdate(APIView):
+    '''
+    Update the original URL of a shortened URL
+    '''
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, pk):
+        user = request.user
+        try:
+            url_shortener = URLShortener.objects.get(pk=pk, user=user)
+        except URLShortener.DoesNotExist:
+            return Response({'error': 'URL not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = URLShortenerSerializer(url_shortener, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+class URLShortenerDelete(APIView):
+    '''
+    Delete a shortened URL
+    '''
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        user = request.user
+        try:
+            url_shortener = URLShortener.objects.get(pk=pk, user=user)
+        except URLShortener.DoesNotExist:
+            return Response({'error': 'URL not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        url_shortener.delete()
+        return Response({'message': 'URL deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
